@@ -18,5 +18,5 @@
 
 set -euo pipefail
 echo "Tunneling to Django at http://127.0.0.1:8000 ..."
-echo "Copy the https URL cloudflared prints below into hw3/.env as EXPO_PUBLIC_API_BASE_URL=.../api"
+echo "Copy the https URL cloudflared prints below into frontend/.env as EXPO_PUBLIC_API_BASE_URL=.../api"
 exec cloudflared tunnel --url http://127.0.0.1:8000

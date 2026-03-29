@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "hw3",
-    "slug": "hw3",
+    "name": "frontend",
+    "slug": "frontend",
     "version": "1.0.0",
     
     
-      "scheme": "hw3",
+      "scheme": "frontend",
       "platforms": ["ios", "android", "web"],
       "web": {
         "bundler": "metro",
