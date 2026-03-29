@@ -6,12 +6,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
 import { ScreenContent } from '@/components/ScreenContent';
-import { increment, decrement } from '@/store/slices/counterSlice';
 import { createUser } from '@/store/slices/usersSlice';
 import type { AppDispatch, RootState } from '@/store';
 
 export default function Home() {
-  const count = useSelector((state: RootState) => state.counter.value);
   const creating = useSelector((state: RootState) => state.users.creating);
   const usersError = useSelector((state: RootState) => state.users.error);
   const dispatch = useDispatch<AppDispatch>();
@@ -36,7 +34,7 @@ export default function Home() {
           phone_number: phoneNumber.trim(),
         })
       ).unwrap();
-      setFormMessage('User created successfully. Add goals on the next screen.');
+      setFormMessage('User created successfully. Open Goals to add goals for this profile.');
       setFirstName('');
       setLastName('');
       setEmail('');
@@ -51,12 +49,10 @@ export default function Home() {
       <Stack.Screen options={{ title: 'Home' }} />
       <Container>
         <ScreenContent path="app/index.tsx" title="Home">
-          <Text style={styles.countText}>Counter: {count}</Text>
-          <View style={styles.buttonRow}>
-            <Button title="− Decrement" onPress={() => dispatch(decrement())} />
-            <Button title="+ Increment" onPress={() => dispatch(increment())} />
-          </View>
-          <Text style={styles.sectionTitle}>Create User</Text>
+          <Text style={styles.sectionTitle}>Create user</Text>
+          <Text style={styles.helperText}>
+            New here? Add your details once. Your goals are saved on the server by email.
+          </Text>
           <TextInput
             style={styles.input}
             value={firstName}
@@ -86,10 +82,19 @@ export default function Home() {
             placeholder="Phone number (optional)"
             keyboardType="phone-pad"
           />
-          <Button title={creating ? 'Saving...' : 'Create User'} onPress={onSubmit} />
+          <Button title={creating ? 'Saving...' : 'Create user'} onPress={onSubmit} />
           {formMessage ? <Text style={styles.messageText}>{formMessage}</Text> : null}
           {usersError ? <Text style={styles.errorText}>{usersError}</Text> : null}
         </ScreenContent>
+
+        <View style={styles.returningBlock}>
+          <Text style={styles.returningTitle}>Returning user?</Text>
+          <Text style={styles.returningBody}>
+            If you already created your profile, tap Goals to view your goal board, select your name,
+            and add or review goals.
+          </Text>
+        </View>
+
         <Link href={{ pathname: '/details' }} asChild>
           <Button title="Goals" />
         </Link>
@@ -103,18 +108,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
   },
-  countText: {
-    fontSize: 18,
-    marginVertical: 12,
-  },
-  buttonRow: {
-    gap: 8,
-    marginBottom: 16,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
+    alignSelf: 'stretch',
+  },
+  helperText: {
+    fontSize: 14,
+    color: '#444',
+    marginBottom: 12,
+    alignSelf: 'stretch',
+    lineHeight: 20,
   },
   input: {
     borderWidth: 1,
@@ -128,9 +133,28 @@ const styles = StyleSheet.create({
   messageText: {
     marginTop: 8,
     color: '#0a7f36',
+    alignSelf: 'stretch',
   },
   errorText: {
     marginTop: 8,
     color: '#b00020',
+    alignSelf: 'stretch',
+  },
+  returningBlock: {
+    width: '100%',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  returningTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+    color: '#111',
+  },
+  returningBody: {
+    fontSize: 14,
+    color: '#444',
+    lineHeight: 20,
   },
 });

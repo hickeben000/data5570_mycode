@@ -1,5 +1,13 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, TextInput, FlatList } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  useWindowDimensions,
+} from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useDispatch, useSelector } from 'react-redux';
 import { Stack } from 'expo-router';
@@ -19,8 +27,8 @@ const FREQUENCIES = [
 ] as const;
 
 export default function Details() {
+  const { width } = useWindowDimensions();
   const dispatch = useDispatch<AppDispatch>();
-  const count = useSelector((state: RootState) => state.counter.value);
   const users = useSelector((state: RootState) => state.users.items);
   const usersLoading = useSelector((state: RootState) => state.users.loading);
   const goals = useSelector((state: RootState) => state.goals.items);
@@ -32,6 +40,22 @@ export default function Details() {
   const [goalTitle, setGoalTitle] = useState('');
   const [frequency, setFrequency] = useState<(typeof FREQUENCIES)[number]['value']>('daily');
   const [formMessage, setFormMessage] = useState<string | null>(null);
+  const isDesktopBoard = width >= 1200;
+  const goalsByFrequency = {
+    daily: goals.filter((goal) => goal.frequency === 'daily'),
+    weekly: goals.filter((goal) => goal.frequency === 'weekly'),
+    monthly: goals.filter((goal) => goal.frequency === 'monthly'),
+    yearly: goals.filter((goal) => goal.frequency === 'yearly'),
+  };
+  const headerStyleByFrequency = useMemo(
+    () => ({
+      daily: styles.dailyHeader,
+      weekly: styles.weeklyHeader,
+      monthly: styles.monthlyHeader,
+      yearly: styles.yearlyHeader,
+    }),
+    []
+  );
 
   useEffect(() => {
     dispatch(fetchUsers());
@@ -74,30 +98,51 @@ export default function Details() {
       <Stack.Screen options={{ title: 'Goals' }} />
       <Container>
         <ScreenContent path="app/details.tsx" title="Goal tracking">
-          <Text style={styles.countText}>Counter from Redux: {count}</Text>
-
           <Text style={styles.sectionTitle}>Add goal</Text>
           {usersLoading ? <Text>Loading users...</Text> : null}
 
           <Text style={styles.label}>User</Text>
-          <View style={styles.pickerWrap}>
-            <Picker
-              selectedValue={selectedUserId}
-              onValueChange={(v) => setSelectedUserId(String(v))}
-              enabled={users.length > 0}>
+          {Platform.OS === 'web' ? (
+            <View style={styles.webUserList}>
               {users.length === 0 ? (
-                <Picker.Item label="No users yet — add one on Home" value="" />
+                <Text style={styles.emptyColumnText}>No users yet — add one on Home</Text>
               ) : (
-                users.map((u) => (
-                  <Picker.Item
-                    key={u.id}
-                    label={`${u.first_name} ${u.last_name}`}
-                    value={String(u.id)}
-                  />
-                ))
+                users.map((u) => {
+                  const id = String(u.id);
+                  const selected = id === selectedUserId;
+                  return (
+                    <Pressable
+                      key={u.id}
+                      onPress={() => setSelectedUserId(id)}
+                      style={[styles.userChip, selected && styles.userChipSelected]}>
+                      <Text style={[styles.userChipText, selected && styles.userChipTextSelected]}>
+                        {u.first_name} {u.last_name}
+                      </Text>
+                    </Pressable>
+                  );
+                })
               )}
-            </Picker>
-          </View>
+            </View>
+          ) : (
+            <View style={styles.pickerWrap}>
+              <Picker
+                selectedValue={selectedUserId}
+                onValueChange={(v) => setSelectedUserId(String(v))}
+                enabled={users.length > 0}>
+                {users.length === 0 ? (
+                  <Picker.Item label="No users yet — add one on Home" value="" />
+                ) : (
+                  users.map((u) => (
+                    <Picker.Item
+                      key={u.id}
+                      label={`${u.first_name} ${u.last_name}`}
+                      value={String(u.id)}
+                    />
+                  ))
+                )}
+              </Picker>
+            </View>
+          )}
 
           <TextInput
             style={styles.input}
@@ -107,35 +152,65 @@ export default function Details() {
           />
 
           <Text style={styles.label}>Frequency</Text>
-          <View style={styles.pickerWrap}>
-            <Picker selectedValue={frequency} onValueChange={(v) => setFrequency(v)}>
-              {FREQUENCIES.map((f) => (
-                <Picker.Item key={f.value} label={f.label} value={f.value} />
-              ))}
-            </Picker>
-          </View>
+          {Platform.OS === 'web' ? (
+            <View style={styles.webChipRow}>
+              {FREQUENCIES.map((f) => {
+                const selected = frequency === f.value;
+                return (
+                  <Pressable
+                    key={f.value}
+                    onPress={() => setFrequency(f.value)}
+                    style={[styles.freqChip, selected && styles.freqChipSelected]}>
+                    <Text style={[styles.freqChipText, selected && styles.freqChipTextSelected]}>
+                      {f.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.pickerWrap}>
+              <Picker
+                selectedValue={frequency}
+                onValueChange={(v) => setFrequency(v as (typeof FREQUENCIES)[number]['value'])}>
+                {FREQUENCIES.map((f) => (
+                  <Picker.Item key={f.value} label={f.label} value={f.value} />
+                ))}
+              </Picker>
+            </View>
+          )}
 
           <Button title={goalsCreating ? 'Saving...' : 'Save goal'} onPress={onCreateGoal} />
           {formMessage ? <Text style={styles.messageText}>{formMessage}</Text> : null}
           {goalsError ? <Text style={styles.errorText}>{goalsError}</Text> : null}
 
-          <Text style={[styles.sectionTitle, styles.listHeading]}>All goals</Text>
+          <Text style={[styles.sectionTitle, styles.listHeading]}>All goals by frequency</Text>
           {goalsLoading ? <Text>Loading goals...</Text> : null}
-          <FlatList
-            data={goals}
-            keyExtractor={(item) => String(item.id)}
-            scrollEnabled={false}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={!goalsLoading ? <Text>No goals yet.</Text> : null}
-            renderItem={({ item }) => (
-              <View style={styles.card}>
-                <Text style={styles.nameText}>{item.title}</Text>
-                <Text>
-                  {item.frequency} · {item.user_name}
-                </Text>
-              </View>
-            )}
-          />
+          {!goalsLoading && goals.length === 0 ? <Text>No goals yet.</Text> : null}
+          {!goalsLoading && goals.length > 0 ? (
+            <View style={styles.columnsRow}>
+              {FREQUENCIES.map((frequencyOption) => (
+                <View
+                  key={frequencyOption.value}
+                  style={[styles.column, isDesktopBoard ? styles.columnDesktop : styles.columnMobile]}>
+                  <Text
+                    style={[styles.columnTitle, headerStyleByFrequency[frequencyOption.value]]}>
+                    {frequencyOption.label}
+                  </Text>
+                  {goalsByFrequency[frequencyOption.value].length === 0 ? (
+                    <Text style={styles.emptyColumnText}>No goals</Text>
+                  ) : (
+                    goalsByFrequency[frequencyOption.value].map((item) => (
+                      <View key={item.id} style={styles.card}>
+                        <Text style={styles.nameText}>{item.title}</Text>
+                        <Text>{item.user_name}</Text>
+                      </View>
+                    ))
+                  )}
+                </View>
+              ))}
+            </View>
+          ) : null}
         </ScreenContent>
       </Container>
     </View>
@@ -146,10 +221,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
-  },
-  countText: {
-    fontSize: 18,
-    marginVertical: 12,
   },
   sectionTitle: {
     fontSize: 18,
@@ -172,6 +243,58 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     overflow: 'hidden',
   },
+  webUserList: {
+    width: '100%',
+    gap: 8,
+    marginBottom: 10,
+  },
+  userChip: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+  },
+  userChipSelected: {
+    borderColor: '#6366f1',
+    backgroundColor: '#eef2ff',
+  },
+  userChipText: {
+    fontSize: 15,
+    color: '#111',
+  },
+  userChipTextSelected: {
+    fontWeight: '600',
+    color: '#3730a3',
+  },
+  webChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+    width: '100%',
+  },
+  freqChip: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: '#fff',
+  },
+  freqChipSelected: {
+    borderColor: '#6366f1',
+    backgroundColor: '#6366f1',
+  },
+  freqChipText: {
+    fontSize: 14,
+    color: '#111',
+  },
+  freqChipTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -189,9 +312,51 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: '#b00020',
   },
-  listContent: {
-    gap: 8,
+  columnsRow: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
     paddingBottom: 24,
+  },
+  column: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+    backgroundColor: '#fafafa',
+  },
+  columnDesktop: {
+    width: '24%',
+    minWidth: 220,
+  },
+  columnMobile: {
+    width: '100%',
+  },
+  columnTitle: {
+    fontWeight: '700',
+    fontSize: 16,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    color: '#fff',
+    overflow: 'hidden',
+  },
+  dailyHeader: {
+    backgroundColor: '#10b981',
+  },
+  weeklyHeader: {
+    backgroundColor: '#3b82f6',
+  },
+  monthlyHeader: {
+    backgroundColor: '#f59e0b',
+  },
+  yearlyHeader: {
+    backgroundColor: '#8b5cf6',
+  },
+  emptyColumnText: {
+    color: '#666',
   },
   card: {
     borderWidth: 1,
