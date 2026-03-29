@@ -20,6 +20,7 @@ type UsersState = {
   items: AppUser[];
   loading: boolean;
   creating: boolean;
+  deleting: boolean;
   error: string | null;
 };
 
@@ -29,6 +30,7 @@ const initialState: UsersState = {
   items: [],
   loading: false,
   creating: false,
+  deleting: false,
   error: null,
 };
 
@@ -61,6 +63,17 @@ export const createUser = createAsyncThunk<AppUser, CreateUserPayload>(
   }
 );
 
+export const deleteUser = createAsyncThunk<number, number>('users/deleteUser', async (userId) => {
+  const response = await fetch(`${API_BASE_URL}/users/${userId}/`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(errorBody || `Failed to delete user (${response.status})`);
+  }
+  return userId;
+});
+
 const usersSlice = createSlice({
   name: 'users',
   initialState,
@@ -90,6 +103,18 @@ const usersSlice = createSlice({
       .addCase(createUser.rejected, (state, action) => {
         state.creating = false;
         state.error = action.error.message ?? 'Failed to create user.';
+      })
+      .addCase(deleteUser.pending, (state) => {
+        state.deleting = true;
+        state.error = null;
+      })
+      .addCase(deleteUser.fulfilled, (state, action) => {
+        state.deleting = false;
+        state.items = state.items.filter((u) => u.id !== action.payload);
+      })
+      .addCase(deleteUser.rejected, (state, action) => {
+        state.deleting = false;
+        state.error = action.error.message ?? 'Failed to delete user.';
       });
   },
 });

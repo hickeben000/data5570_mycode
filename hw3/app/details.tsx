@@ -1,5 +1,6 @@
 import { createElement, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
+  Alert,
   Platform,
   Pressable,
   StyleSheet,
@@ -16,7 +17,7 @@ import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
 import { ScreenContent } from '@/components/ScreenContent';
 import { createGoal, fetchGoals } from '@/store/slices/goalsSlice';
-import { fetchUsers } from '@/store/slices/usersSlice';
+import { deleteUser, fetchUsers } from '@/store/slices/usersSlice';
 import type { AppDispatch, RootState } from '@/store';
 
 const FREQUENCIES = [
@@ -41,7 +42,7 @@ function WebUserDropdown({
     fontSize: 16,
     borderRadius: 8,
     border: '1px solid #ccc',
-    marginBottom: 10,
+    marginBottom: 0,
     backgroundColor: '#fff',
   };
 
@@ -75,6 +76,7 @@ export default function Details() {
   const dispatch = useDispatch<AppDispatch>();
   const users = useSelector((state: RootState) => state.users.items);
   const usersLoading = useSelector((state: RootState) => state.users.loading);
+  const userDeleting = useSelector((state: RootState) => state.users.deleting);
   const goals = useSelector((state: RootState) => state.goals.items);
   const goalsLoading = useSelector((state: RootState) => state.goals.loading);
   const goalsCreating = useSelector((state: RootState) => state.goals.creating);
@@ -122,6 +124,31 @@ export default function Details() {
     }
   }, [users, selectedUserId]);
 
+  const confirmDeleteSelectedUser = () => {
+    if (!selectedUserId || users.length === 0) return;
+    const id = Number(selectedUserId);
+    const runDelete = async () => {
+      try {
+        await dispatch(deleteUser(id)).unwrap();
+        setSelectedUserId('');
+        setFormMessage('User deleted.');
+      } catch {
+        setFormMessage('Could not delete user.');
+      }
+    };
+    const message = 'Delete this user and all of their goals? This cannot be undone.';
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm(message)) {
+        void runDelete();
+      }
+    } else {
+      Alert.alert('Delete user', message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void runDelete() },
+      ]);
+    }
+  };
+
   const onCreateGoal = async () => {
     if (!selectedUserId) {
       setFormMessage('Create a user on the Home screen first.');
@@ -151,37 +178,54 @@ export default function Details() {
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Goals' }} />
       <Container>
-        <ScreenContent path="app/details.tsx" title="Goal tracking">
+        <ScreenContent path="app/details.tsx" title="Goal tracking" showEditInfo={false}>
           <Text style={styles.sectionTitle}>Add goal</Text>
           {usersLoading ? <Text>Loading users...</Text> : null}
 
           <Text style={styles.label}>User</Text>
-          {Platform.OS === 'web' ? (
-            <WebUserDropdown
-              users={users}
-              selectedUserId={selectedUserId}
-              onSelectUserId={setSelectedUserId}
-            />
-          ) : (
-            <View style={styles.pickerWrap}>
-              <Picker
-                selectedValue={selectedUserId}
-                onValueChange={(v) => setSelectedUserId(String(v))}
-                enabled={users.length > 0}>
-                {users.length === 0 ? (
-                  <Picker.Item label="No users yet — add one on Home" value="" />
-                ) : (
-                  users.map((u) => (
-                    <Picker.Item
-                      key={u.id}
-                      label={`${u.first_name} ${u.last_name}`}
-                      value={String(u.id)}
-                    />
-                  ))
-                )}
-              </Picker>
-            </View>
-          )}
+          <Text style={styles.dropdownHint}>
+            Choose a user, then use Delete user to remove that profile and their goals.
+          </Text>
+          <View style={styles.userRow}>
+            {Platform.OS === 'web' ? (
+              <View style={styles.userPickerGrow}>
+                <WebUserDropdown
+                  users={users}
+                  selectedUserId={selectedUserId}
+                  onSelectUserId={setSelectedUserId}
+                />
+              </View>
+            ) : (
+              <View style={[styles.pickerWrap, styles.userPickerGrow]}>
+                <Picker
+                  selectedValue={selectedUserId}
+                  onValueChange={(v) => setSelectedUserId(String(v))}
+                  enabled={users.length > 0}>
+                  {users.length === 0 ? (
+                    <Picker.Item label="No users yet — add one on Home" value="" />
+                  ) : (
+                    users.map((u) => (
+                      <Picker.Item
+                        key={u.id}
+                        label={`${u.first_name} ${u.last_name}`}
+                        value={String(u.id)}
+                      />
+                    ))
+                  )}
+                </Picker>
+              </View>
+            )}
+            <Pressable
+              onPress={confirmDeleteSelectedUser}
+              disabled={!selectedUserId || users.length === 0 || userDeleting}
+              style={({ pressed }) => [
+                styles.deleteUserBtn,
+                (!selectedUserId || users.length === 0 || userDeleting) && styles.deleteUserBtnDisabled,
+                pressed && styles.deleteUserBtnPressed,
+              ]}>
+              <Text style={styles.deleteUserBtnText}>{userDeleting ? '…' : 'Delete user'}</Text>
+            </Pressable>
+          </View>
 
           <TextInput
             style={styles.input}
@@ -278,6 +322,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 4,
+  },
+  dropdownHint: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+    alignSelf: 'stretch',
+    lineHeight: 16,
+  },
+  userRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  userPickerGrow: {
+    flex: 1,
+    minWidth: 0,
+    alignSelf: 'stretch',
+  },
+  deleteUserBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#b91c1c',
+    backgroundColor: '#fff',
+    flexShrink: 0,
+  },
+  deleteUserBtnPressed: {
+    opacity: 0.85,
+  },
+  deleteUserBtnDisabled: {
+    opacity: 0.45,
+    borderColor: '#ccc',
+  },
+  deleteUserBtnText: {
+    color: '#b91c1c',
+    fontWeight: '600',
+    fontSize: 14,
   },
   pickerWrap: {
     borderWidth: 1,

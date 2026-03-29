@@ -1,5 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 
+import { deleteUser } from './usersSlice';
+
 export type Goal = {
   id: number;
   user: number;
@@ -86,6 +88,10 @@ const goalsSlice = createSlice({
       .addCase(createGoal.rejected, (state, action) => {
         state.creating = false;
         state.error = action.error.message ?? 'Failed to create goal.';
+      })
+      .addCase(deleteUser.fulfilled, (state, action) => {
+        const removedId = action.payload;
+        state.items = state.items.filter((g) => g.user !== removedId);
       });
   },
 });

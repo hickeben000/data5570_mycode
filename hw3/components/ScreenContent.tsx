@@ -6,15 +6,17 @@ import EditScreenInfo from './EditScreenInfo';
 type ScreenContentProps = {
   title: string;
   path: string;
+  /** Set false to hide the “Open app/...tsx” template text (e.g. production screens). */
+  showEditInfo?: boolean;
   children?: React.ReactNode;
 };
 
-export const ScreenContent = ({ title, path, children }: ScreenContentProps) => {
+export const ScreenContent = ({ title, path, children, showEditInfo = true }: ScreenContentProps) => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
       <View style={styles.separator} />
-      <EditScreenInfo path={path} />
+      {showEditInfo ? <EditScreenInfo path={path} /> : null}
       {children}
     </View>
   );
