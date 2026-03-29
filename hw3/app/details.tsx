@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { createElement, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
   Platform,
   Pressable,
@@ -26,6 +26,50 @@ const FREQUENCIES = [
   { value: 'yearly', label: 'Yearly' },
 ] as const;
 
+function WebUserDropdown({
+  users,
+  selectedUserId,
+  onSelectUserId,
+}: {
+  users: { id: number; first_name: string; last_name: string }[];
+  selectedUserId: string;
+  onSelectUserId: (id: string) => void;
+}) {
+  const style: CSSProperties = {
+    width: '100%',
+    padding: '12px 10px',
+    fontSize: 16,
+    borderRadius: 8,
+    border: '1px solid #ccc',
+    marginBottom: 10,
+    backgroundColor: '#fff',
+  };
+
+  if (users.length === 0) {
+    return createElement(
+      'select',
+      { disabled: true, style },
+      createElement('option', { value: '' }, 'No users yet — add one on Home')
+    );
+  }
+
+  return createElement(
+    'select',
+    {
+      value: selectedUserId,
+      style,
+      onChange: (e: { target: { value: string } }) => onSelectUserId(e.target.value),
+    },
+    users.map((u) =>
+      createElement(
+        'option',
+        { key: u.id, value: String(u.id) },
+        `${u.first_name} ${u.last_name}`
+      )
+    )
+  );
+}
+
 export default function Details() {
   const { width } = useWindowDimensions();
   const dispatch = useDispatch<AppDispatch>();
@@ -41,12 +85,22 @@ export default function Details() {
   const [frequency, setFrequency] = useState<(typeof FREQUENCIES)[number]['value']>('daily');
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const isDesktopBoard = width >= 1200;
-  const goalsByFrequency = {
-    daily: goals.filter((goal) => goal.frequency === 'daily'),
-    weekly: goals.filter((goal) => goal.frequency === 'weekly'),
-    monthly: goals.filter((goal) => goal.frequency === 'monthly'),
-    yearly: goals.filter((goal) => goal.frequency === 'yearly'),
-  };
+
+  const goalsForSelectedUser = useMemo(() => {
+    if (!selectedUserId) return [];
+    const uid = Number(selectedUserId);
+    return goals.filter((g) => g.user === uid);
+  }, [goals, selectedUserId]);
+
+  const goalsByFrequency = useMemo(
+    () => ({
+      daily: goalsForSelectedUser.filter((g) => g.frequency === 'daily'),
+      weekly: goalsForSelectedUser.filter((g) => g.frequency === 'weekly'),
+      monthly: goalsForSelectedUser.filter((g) => g.frequency === 'monthly'),
+      yearly: goalsForSelectedUser.filter((g) => g.frequency === 'yearly'),
+    }),
+    [goalsForSelectedUser]
+  );
   const headerStyleByFrequency = useMemo(
     () => ({
       daily: styles.dailyHeader,
@@ -103,26 +157,11 @@ export default function Details() {
 
           <Text style={styles.label}>User</Text>
           {Platform.OS === 'web' ? (
-            <View style={styles.webUserList}>
-              {users.length === 0 ? (
-                <Text style={styles.emptyColumnText}>No users yet — add one on Home</Text>
-              ) : (
-                users.map((u) => {
-                  const id = String(u.id);
-                  const selected = id === selectedUserId;
-                  return (
-                    <Pressable
-                      key={u.id}
-                      onPress={() => setSelectedUserId(id)}
-                      style={[styles.userChip, selected && styles.userChipSelected]}>
-                      <Text style={[styles.userChipText, selected && styles.userChipTextSelected]}>
-                        {u.first_name} {u.last_name}
-                      </Text>
-                    </Pressable>
-                  );
-                })
-              )}
-            </View>
+            <WebUserDropdown
+              users={users}
+              selectedUserId={selectedUserId}
+              onSelectUserId={setSelectedUserId}
+            />
           ) : (
             <View style={styles.pickerWrap}>
               <Picker
@@ -184,10 +223,15 @@ export default function Details() {
           {formMessage ? <Text style={styles.messageText}>{formMessage}</Text> : null}
           {goalsError ? <Text style={styles.errorText}>{goalsError}</Text> : null}
 
-          <Text style={[styles.sectionTitle, styles.listHeading]}>All goals by frequency</Text>
+          <Text style={[styles.sectionTitle, styles.listHeading]}>Goals for this user</Text>
+          {!selectedUserId ? (
+            <Text style={styles.emptyColumnText}>Select a user to see their goals.</Text>
+          ) : null}
           {goalsLoading ? <Text>Loading goals...</Text> : null}
-          {!goalsLoading && goals.length === 0 ? <Text>No goals yet.</Text> : null}
-          {!goalsLoading && goals.length > 0 ? (
+          {!goalsLoading && selectedUserId && goalsForSelectedUser.length === 0 ? (
+            <Text>No goals for this user yet.</Text>
+          ) : null}
+          {!goalsLoading && selectedUserId && goalsForSelectedUser.length > 0 ? (
             <View style={styles.columnsRow}>
               {FREQUENCIES.map((frequencyOption) => (
                 <View
@@ -203,7 +247,6 @@ export default function Details() {
                     goalsByFrequency[frequencyOption.value].map((item) => (
                       <View key={item.id} style={styles.card}>
                         <Text style={styles.nameText}>{item.title}</Text>
-                        <Text>{item.user_name}</Text>
                       </View>
                     ))
                   )}
@@ -242,31 +285,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 10,
     overflow: 'hidden',
-  },
-  webUserList: {
-    width: '100%',
-    gap: 8,
-    marginBottom: 10,
-  },
-  userChip: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: '#fff',
-  },
-  userChipSelected: {
-    borderColor: '#6366f1',
-    backgroundColor: '#eef2ff',
-  },
-  userChipText: {
-    fontSize: 15,
-    color: '#111',
-  },
-  userChipTextSelected: {
-    fontWeight: '600',
-    color: '#3730a3',
   },
   webChipRow: {
     flexDirection: 'row',
